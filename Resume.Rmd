@@ -1,0 +1,68 @@
+---
+title: "Resume"
+author: "Chris Holman"
+date: "1/17/2022"
+output: html_document
+---
+
+## Logistic regression
+# Import and view data
+```{r}
+data(resume)
+glimpse(resume)
+```
+# explore tools
+?feglm
+# Logistic Regression - resume callback on receiving honors
+```{r}
+resume_m1 <-
+  feglm(
+    received_callback ~ honors,
+    family = "binomial",
+    data = resume
+  )
+summary(resume_m1)
+```
+# Logistic regression - resume call back regressed on city, experience, honors, military service, having email adress, race, and gender
+```{r}
+resume_m2 <-
+  feglm(
+    received_callback ~ 
+      job_city +
+      years_experience +
+      honors + 
+      military +
+      has_email_address +
+      race +
+      gender,
+    family = "binomial",
+    data = resume
+  )
+summary(resume_m2)mdve_table2$share[4]
+```
+# View regressions
+```{r}
+glance(resume_m1)
+glance(resume_m2)
+
+modelsummary(
+  list(
+    resume_m1,
+    resume_m2
+  ),
+  estimate = "{estimate}{stars} <br> ({std.error})",
+  statistic = NULL,
+)
+```
+# View model summaries excluding items
+```{r}
+modelsummary(
+  list(
+   resume_m1,
+    resume_2
+  ),
+  estimate = "{estimate}{stars} <br> ({std.error})",
+  statistic = NULL,
+  gof_omit = "R2 Within|R2 Pseudo|BIC|Log.Lik.|Std.Errors"
+)
+```
