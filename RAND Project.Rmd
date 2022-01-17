@@ -1,0 +1,236 @@
+---
+title: "RAND Health Study" 
+author: "Chris Holman"
+date: "1/17/2022"
+output: html_document
+---
+# Load Libraries
+library(tidyverse)
+library(broom)
+library(scales)
+library(fixest)
+library(skimr)
+library(ggplot2)
+
+# Load Data
+
+```{r}
+data("rand_sample", package = "masteringmetrics")
+
+devtools::install_github("jrnold/masteringmetrics", subdir = "masteringmetrics")  
+```
+  
+# Explore Data
+
+```{r}
+varlist <- c("plantype", "female", "blackhisp", "age", "educper",
+             "income1cpi", "hosp", "ghindx", "ghindxx", "cholest", "diastol",
+             "systol", "mhi", "fam_identifier")
+```
+             
+
+# Filter Data/ Create Data Subset
+```{r}
+rand_sample_small <- 
+  rand_sample %>%
+  select(one_of(varlist))
+```
+
+
+
+#Visualize Data
+
+```{r}
+rand_sample_small %>%
+  group_by(plantype) %>%
+  summarise(n = n()) %>%
+  ggplot(
+    aes(
+      x = plantype,
+      y = n)
+  ) +
+  geom_col(fill = "orange")
+```
+  
+#Summarise Data
+```{r}
+rand_sample_small %>%
+  group_by(plantype) %>%
+  summarise(
+    number_enrolled = n(),
+    female_mean = mean(female),
+    nonwhite_mean = mean(blackhisp, na.rm = T),
+    age_mean = mean(age, na.rm = T),
+    education_mean = mean(educper, na.rm = T),
+    fam_income_mean = mean(income1cpi))
+```
+# cmd + shft + c Comment all
+# na.rm = TRUE, will skip missing values
+
+# Regression
+```{r}
+rand_sample_small %>%
+  feols(income1cpi ~ plantype, data = .) %>%
+  tidy(cluster = "fam_identifier")
+```
+
+#Data Summary of Person, Start Year, and Year
+```{r}
+rand_person_spend %>%
+  select(
+    person,
+    indv_start_year,
+    year
+  )%>%
+  arrange(
+    person,
+    year
+  )
+```
+
+# Create variable for year of observation
+```{r}
+rand_person_spend <-
+  rand_person_spend %>%
+  mutate(
+    expyear = indv_start_year + year - 1
+  )
+
+```
+
+# Summarize data to confirm correct addition of new variable
+```{r}
+
+rand_person_spend %>%
+  select(
+    person,
+    indv_start_year,
+    year,
+    expyear
+  )%>%
+  arrange(
+    person,
+    year
+  )
+```
+
+
+# Create CPI Table to join to existing data
+```{r}
+cpi <- tribble(
+  ~ year, ~ cpi,
+  1973, 3.07,
+  1974, 2.76,
+  1975, 2.53,
+  1976, 2.39,
+  1977, 2.24,
+  1978, 2.09,
+  1979, 1.88,
+  1980, 1.65,
+  1981, 1.5,
+  1982, 1.41,
+  1983, 1.37,
+  1984, 1.31,
+  1985, 1.27)
+```
+
+# Join CPI table to existing data (Must run this code indepently before moving on)
+```{r}
+rand_person_spend <-
+  rand_person_spend %>%
+  left_join(cpi, by = c("expyear" = "year")
+  )
+```
+
+# Summarize data to confirm correct addition of CPI table to existing data
+```{r}
+rand_person_spend %>%
+  select(
+    person,
+    expyear,
+    cpi
+  ) %>%
+  arrange(
+    person,
+    expyear)
+```
+
+# Create inflation 
+```{r}
+rand_person_spend <- 
+  rand_person_spend %>%
+  mutate(
+    outpatient_inf = outsum * cpi,
+    inpatient_inf = inpdol * cpi,
+    total_inf = outpatient_inf + inpatient_inf
+  )
+```
+# Summarize inflation
+```{r}
+rand_person_spend %>%
+  group_by(
+    plantype
+  ) %>%
+  summarise(
+    count = n(),
+    outpatient_mean = mean(outpatient_inf),
+    outpatient_sd = sd(outpatient_inf),
+    inpatient_mean = mean(inpatient_inf),
+    inpatient_sd = sd(inpatient_inf),
+    total_mean = mean(total_inf),
+    total_sd = sd(total_inf)
+  )
+```
+
+# Visualize health care speding by plan type
+```{r}
+rand_person_spend %>%
+  group_by(
+    plantype
+  ) %>% 
+  summarise(
+    avg_spending = mean(total_inf)
+  ) %>% 
+  ggplot(
+    aes(
+      x = plantype,
+      y = avg_spending
+    )
+  ) + 
+  geom_col(fill = "darkgreen") +
+  scale_y_continuous(labels = scales::dollar) +
+  theme_minimal() +
+  labs(
+    y = "Average Spending ($)",
+    x = "",
+    title = "Average Health Expenditure by Health Plan"
+  )
+```
+
+# Visualize average spending on health care by plan type from 1974-85
+```{r}
+rand_person_spend %>% 
+  group_by(
+    plantype,
+    expyear
+  ) %>%
+  summarise(
+    avg_spending = mean(total_inf)
+  ) %>% 
+  ggplot(
+    aes(
+      x = expyear,
+      y = avg_spending,
+      color = plantype
+    )
+  ) +
+  geom_line(size = 1) +
+  theme_minimal() +
+  labs(
+    y = "Average Spending ($)",
+    x = "Year",
+    title = "Average Health Expenditure by Health Plan (1974-85)"
+  )
+```
+
+
