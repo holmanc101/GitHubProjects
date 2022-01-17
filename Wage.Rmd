@@ -1,0 +1,155 @@
+---
+title: "Wage" 
+author: "Chris Holman"
+date: "1/17/2022"
+output: html_document
+---
+#### Install Packages
+```{r}
+install.packages("wooldridge")
+
+install.packages("modelsummary")
+```
+
+# Open Libraries
+```{r}
+library(tidyverse)
+library(broom)
+library(scales)
+library(fixest)
+library(skimr)
+library(modelsummary)
+library(wooldridge)
+```
+
+# Call in data
+```{r}
+data("wage1")
+head(wage1)
+?wage1
+```
+
+
+# Estimating gender pay gap
+# OLS
+```{r}
+wage_reg0 <- 
+  feols(
+    wage ~ female,
+    data = wage1
+  )
+
+summary(wage_reg0)
+```
+# Control for experience
+```{r}
+wage_reg1 <- 
+  feols(
+    wage ~ educ + exper + tenure + female,
+    data = wage1
+  )
+
+summary(wage_reg1)
+```
+
+
+
+# Create profiles to predict wages
+```{r}
+new_df_male <- 
+  data.frame(
+  educ = 14,
+  exper  = 3,
+  tenure = 2,
+  female = 0
+)
+
+new_df_female <- 
+  data.frame(
+    educ = 14,
+    exper  = 3,
+    tenure = 2,
+    female = 1  
+  )
+```
+
+
+
+# Predict wages
+```{r}
+wage_male1 <- predict(wage_reg1, new_df_male)
+wage_female1 <- predict(wage_reg1, new_df_female)
+wage_female1 - wage_male1
+summary(wage_reg1)
+```
+
+
+
+# Create Table
+```{r}
+modelsummary(
+  list(
+  wage_reg0,
+  wage_reg1)
+)
+```
+
+# Create variables for married males, married females, and single females. (single males set as control)
+```{r}
+wage2 <-
+  wage1 %>%
+  mutate(
+    marrmale = (1-female) * married,
+    marrfem = female * married,
+    singfem = female * (1-married)
+  )
+```
+
+# Create subset dataset
+```{r}
+wage2 %>% 
+  select (
+    female,
+    married,
+    marrmale,
+    marrfem,
+    singfem
+  )
+
+```
+
+# Regress log wage on education, experience, gender, and marital status
+```{r}
+wage_reg2 <-
+  feols(
+    log(wage) ~ marrmale + 
+      marrfem + 
+      singfem + 
+      educ + 
+      exper + 
+      exper^2 + 
+      tenure + 
+      tenure^2,
+    data = wage2
+  )
+
+summary(wage_reg2)
+```
+### Create Table Output
+```{r}
+modelsummary(
+  list(
+    wage_reg0,
+    wage_reg1
+  ),
+  estimate = "{estimate}{stars} <br> ({std.error})",
+  statistic = NULL,
+  coef_map = c(
+    "educ"= "Education",
+    "female" = "Female",
+    "exper" = "Experience",
+    "tenure" = "Tenure"
+  ),
+  gof_omit = "R2 Within|R2 Pseudo|AIC|BIC|Log.Lik.|Std.Errors"
+)
+```

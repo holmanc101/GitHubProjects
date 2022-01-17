@@ -1,0 +1,50 @@
+---
+title: "House Price"
+author: "Chris Holman"
+date: "1/17/2022"
+output: html_document
+---
+
+# Import data and display data info
+```{r}
+data("hprice1")
+head(hprice1)
+?hprice1
+```
+# OLS Regression for house price(log) based on lot size(log), square footage(log), number of bedrooms and construction type
+```{r}
+hprice_reg1 <-
+  feols(
+    log(price) ~ log(lotsize) + log(sqrft) + bdrms + colonial,
+    data = hprice1
+  )
+
+summary(hprice_reg1)
+```
+# Import dataset 2
+```{r}
+data("hprice2")
+head(hprice2)
+?hprice2
+```
+# regress housing price (log) on pollution, distance, number of rooms, number of rooms squared and location
+```{r}
+hprice_reg2 <- 
+    feols(
+      log(price) ~ log(nox) + log(dist) + rooms + rooms^2 +stratio,
+      data = hprice2
+    )
+summary(hprice_reg2)
+```
+# Visualize price against the number of rooms
+```{r}
+hprice2 %>% 
+  ggplot(
+    aes(
+      y = log(price),
+      x = rooms
+    )
+  ) + 
+  geom_point()
+```
+

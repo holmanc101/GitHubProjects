@@ -1,0 +1,186 @@
+---
+title: "HMDA"
+author: "Chris Holman"
+date: "1/17/2022"
+output: html_document
+---
+
+# Open Libraries
+library(tidyverse)
+library(broom)
+library(scales)
+library(fixest)
+library(skimr)
+library(modelsummary)
+library(wooldridge)
+library(AER)
+
+### Linear Probability Model
+data(HMDA)
+?HMDA
+
+## convert from No/Yes to 0/1
+
+HMDA <- 
+  HMDA %>%
+  mutate(
+    deny2 = as.numeric(deny) - 1
+  )
+
+HMDA %>%
+  group_by(
+    deny, deny2
+  )%>%
+  tally()
+
+HMDA %>%
+  ggplot(
+    aes(
+      x = pirat
+    )
+    )+ 
+      geom_density()
+
+HMDA %>%
+filter(
+  pirat >= .5,
+  pirat< 1
+) %>%
+  tally()
+
+HMDA_m1 <-
+  feols(
+    deny2 ~ pirat,
+    data = HMDA
+  )
+
+## Robust Std.Errors
+summary(HMDA_m1,
+        se = "hetero")
+head(HMDA$afam)
+
+HMDA <-
+  HMDA %>%
+  mutate(
+    afam2 = as.numeric(afam) - 1
+  )
+
+HMDA %>%
+  group_by(
+    single
+  ) %>%
+  tally() %>%
+  mutate(
+    share = n / sum(n) 
+  )
+
+## share of afam single applicants that had their mortgage app denied
+HMDA %>%
+  group_by(
+    single,
+    afam,
+    deny
+  ) %>%
+  tally() %>%
+  mutate(
+    share = n / sum(n) 
+  )
+
+HMDA_m2 <-
+  feols(
+    deny2 ~ pirat +afam2,
+    data = HMDA
+)
+
+summary(
+  HMDA_m2,
+  se = "hetero"
+)
+
+modelsummary(
+  list(
+    HMDA_m1,
+    HMDA_m2
+  ),
+  
+  estimate = "{estimate}{stars} <br> ({std.error})",
+  statistic = NULL,
+)
+
+pirat <- HMDA %>% select(pirat)
+pirat_afam <- HMDA %>% select(pirat, afam)
+
+HMDA$y_hat <- predict(HMDA_m1, pirat)
+head(HMDA$y_hat)
+
+HMDA$y_hat2 <- predict(HMDA_m2, pirat_afam)
+head(HMDA$y_hat2)
+
+HMDA %>% 
+  ggplot(
+    aes(
+      x = pirat,
+      y = deny2
+    )
+  ) + 
+  geom_point() +
+  geom_line(
+    aes(
+      x = pirat,
+      y = y_hat
+    ),
+    color = "red"
+  )
+
+
+## Logistic regression
+data(resume)
+glimpse(resume)
+
+?feglm
+
+resume_m1 <-
+  feglm(
+    received_callback ~ honors,
+    family = "binomial",
+    data = resume
+  )
+summary(resume_m1)
+
+resume_m2 <-
+  feglm(
+    received_callback ~ 
+      job_city +
+      years_experience +
+      honors + 
+      military +
+      has_email_address +
+      race +
+      gender,
+    family = "binomial",
+    data = resume
+  )
+summary(resume_m2)mdve_table2$share[4]
+
+glance(resume_m1)
+glance(resume_m2)
+
+modelsummary(
+  list(
+    resume_m1,
+    resume_m2
+  ),
+  
+  estimate = "{estimate}{stars} <br> ({std.error})",
+  statistic = NULL,
+)
+
+modelsummary(
+  list(
+   resume_m1,
+    resume_2
+  ),
+  estimate = "{estimate}{stars} <br> ({std.error})",
+  statistic = NULL,
+  gof_omit = "R2 Within|R2 Pseudo|BIC|Log.Lik.|Std.Errors"
+)
